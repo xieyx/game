@@ -1,0 +1,572 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <title>Dots And Boxes 点格棋</title>
+        <meta charset="UTF-8">
+        <meta name="HandheldFriendly" content="true" />
+        <meta name="MobileOptimized" content="width" />
+        <meta name="applicable-device" content="mobile"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+        <style>
+            * {
+                padding: 0;
+                margin: 0;
+            }
+            body {
+                font: 12px Arial, "微软雅黑";
+            }
+            .container {
+                width: 500px;
+                margin: 0 auto;
+            }
+            .title {
+                text-align: center;
+                font-size: 30px;
+                line-height: 80px;
+                height: 80px;
+                cursor: help;
+            }
+            table {
+                float:left;
+                width: 400px;
+                height: 400px;
+                margin: 50px 50px 20px;
+            }
+            table,td {
+                border: 1px solid #000;
+            }
+            td {
+                background: ghostwhite;
+            }
+            tr.space {
+                height: 5px;
+                position: relative;
+            }
+            td.space, tr.space td {
+                border: none;
+                background: transparent
+            }
+            tr.space td.space {
+                position: absolute;
+                width: 11px;
+                height: 11px;
+                border: 3px solid white;
+                border-radius: 100%;
+                margin: -6px 0 0 -6px;
+                background: black;
+                z-index: 2;
+            }
+            td.space {
+                width: 5px;
+            }
+            .players {
+                width: 500px;
+            }
+            .player1, .player2 {
+                float: left;
+                position: relative;
+                width: 230px;
+            }
+            .player2 {
+                float: right;
+            }
+            .players .head {
+                height: 80px;
+                border: 5px solid white;
+            }
+            .player1 .head {
+                float: right;
+                margin-left: 10px;
+                border-color: pink;
+            }
+            .player2 .head {
+                float: left;
+                border-color: cornflowerblue;
+                margin-right: 10px;
+            }
+            .players p {
+                margin: 0;
+                line-height: 30px;
+            }
+            .player1 p {
+                text-align: right;
+            }
+            .vs {
+                float: left;
+                width: 40px;
+                height: 100px;
+                line-height: 100px;
+                text-align: center;
+            }
+            canvas {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 1;
+            }
+            .players i {
+                position: absolute;
+                bottom: -25px;
+                font-style: normal;
+                font-size: 16px;
+                color: black;
+                display: none;
+            }
+            .player1 i {
+                right: 38px;
+            }
+            .player2 i {
+                left: 38px;
+            }
+            .players .banner {
+                position: absolute;
+                display: block;
+                width: 80px;
+                height: 80px;
+                top: 5px;
+                line-height: 80px;
+                text-align: center;
+                font-size: 60px;
+            }
+            .player1 .banner {
+                right: 5px;
+            }
+            .player2 .banner {
+                left: 5px;
+            }
+            @keyframes up {
+                from { bottom: -25px; opacity: 1 }
+                to { bottom: -20px; opacity: 0.2 }
+            }
+
+            .players .active i {
+                display: block;
+                animation: up .5s infinite;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+        
+        </div>
+        <script>
+            function indexInParent(node) {
+                var children = node.parentNode.childNodes;
+                var num = 0;
+                for (var i=0; i<children.length; i++) {
+                    if (children[i]==node) return num;
+                    if (children[i].nodeType==1) num++;
+                }
+                return -1;
+            }
+            function mousePosition(e){ 
+		        e = e || window.event;
+		        var target = e.target || e.srcElement; // 获得事件源
+                if(e.touches && e.touches[0]) {
+                    return {x:e.touches[0].pageX, y:e.touches[0].pageY};
+                }
+                if(e.pageX || e.pageY){ 
+			        return {x:e.pageX, y:e.pageY}; 
+		        }
+		        return { 
+			        x:e.clientX + document.body.scrollLeft - document.body.clientLeft, 
+			        y:e.clientY + document.body.scrollTop - document.body.clientTop 
+		        }; 
+	        }
+            function offset(el) {
+                var rect = el.getBoundingClientRect();
+
+                return {
+                    top: rect.top + scrollTop(),
+                    left: rect.left + scrollLeft()
+                }
+            }
+            function scrollTop() {
+                return document.body.scrollTop ? document.body.scrollTop : document.documentElement.scrollTop;
+            }
+            function scrollLeft() {
+                return document.body.scrollLeft ? document.body.scrollLeft : document.documentElement.scrollLeft;
+            }
+            window.onload = function() {
+                /**
+                 * Rules: Players take turns joining two horizontally or vertically adjacent
+                 * dots by a line. A player that completes the fourth side of a square (a box)
+                 * colors that box and must play again. When all boxes have been colored,
+                 * the game ends and the player who has colored more boxes wins. You are 
+                 * playing against the computer. The computer is red; you are blue.
+                 */
+                var player = function(name, color){
+                    var _this = this;
+                    this.name = name;
+                    this.score = 0;
+                    this.status = 'Waiting';
+                    this.color = color;
+                    this.continue = false;
+                    this.round = function() {
+                        console.log(_this.name+' round!');
+                        _this.status = 'Thinking';
+                        _this.updatePlayerInfo();
+                        if(gameMod == 1 && _this.auto)
+                            _this.auto(_this)
+                        else
+                            _this.play();
+                    };
+                    this.end = function() {
+                        _this.status = 'Waiting';
+                        _this.updatePlayerInfo();
+                        var tmp = waitPlayer;
+                        waitPlayer = _this;
+                        tmp.round();
+                    };
+                    this.addScore = function(box) {
+                        if(!box) return;
+                        box.style.background = _this.color;
+                        _this.score++;
+                        _this.continue = true;
+                        _this.updatePlayerInfo();
+                    };
+                    this.gameOver = function() {
+                        return document.querySelector('.space td:not(.space):not([data-selected=true]),tr:not(.space) .space:not([data-selected=true])') == null;
+                    };
+                    this.updatePlayerInfo = function() {
+                        var p1, p2;
+                        p1 = document.querySelector('.'+_this.name);
+                        p2 = document.querySelector('.'+waitPlayer.name);
+                        p1.className += ' active';
+                        p2.className = p2.className.replace(/\sactive/g,'');
+                        p1.querySelector('.status').innerHTML = _this.status;
+                        p1.querySelector('.score').innerHTML  = _this.score;
+                        document.getElementsByTagName('table')[0].style.borderColor = _this.color;
+                    };
+                    this.play = function() {
+                        var dot = document.getElementsByClassName('dot');
+                        var i, j, t, drag, index = -1, target = -1;
+                        for(i=0; i<dot.length;i++) {
+                            dot[i].onmouseover = function(){
+                                this.style.borderColor = _this.color;
+                                if(index > -1) 
+                                    target = indexInParent(this)/2+indexInParent(this.parentNode)/2*(side+1);
+                            };
+                            dot[i].onmouseout = function(){
+                                this.style.borderColor = 'white';
+                                target = -1;
+                            };
+                            dot[i].addEventListener('touchstart',function(){
+                                this.onmouseover();
+                                this.onmousedown();
+                            });
+                            dot[i].onmousedown = function(e){
+                                target = -1;
+                                var e = e || window.event;
+                                var drag = this;
+                                var startY = offset(drag).top+9;
+		                        var startX = offset(drag).left+8;
+                                if (e && e.preventDefault) 
+                                    e.stopPropagation();
+                                else if (document.all)
+                                    e.cancelBubble=true;
+                                var canvas = document.createElement('canvas');
+                                var body = document.querySelector('body');
+                                var ctx = canvas.getContext("2d");
+                                canvas.setAttribute('width', document.documentElement.clientWidth);
+                                canvas.setAttribute('height', document.documentElement.clientHeight);
+                                body.appendChild(canvas);
+                                // 上下左右四节点可用, 且两节点间的边为可用状态
+                                index = indexInParent(drag)/2+indexInParent(drag.parentNode)/2*(side+1);
+                                var check = {
+                                    'top'    : (Math.floor(index/(side+1))-1)*(side+1)+index%(side+1),
+                                    'left'   : index-1,
+                                    'bottom' : (Math.floor(index/(side+1))+1)*(side+1)+index%(side+1),
+                                    'right'  : index+1
+                                };
+                                var vail = availBorder(drag, index%(side+1)*2, check);
+                                for(j=0; j<dot.length; j++) {
+                                    if(j in vail || j == index) continue;
+                                    dot[j].style.zIndex = 0;
+                                }
+                                drag.onmousemove = function(e){
+                                    var e = e || window.event;
+                                    var poT = scrollTop();
+                                    var poL = scrollLeft();
+                                    var poX = mousePosition(e).x;
+		                        	var poY = mousePosition(e).y;
+                                    //清空画布
+                                    ctx.clearRect(0,0,document.documentElement.clientWidth,document.documentElement.clientHeight);
+                                    ctx.beginPath();
+                                    ctx.strokeStyle = _this.color;
+                                    ctx.lineWidth = 7;
+                                    // 开始点
+                                    ctx.moveTo(startX-poL, startY-poT);
+                                    // 结束点
+                                    ctx.lineTo(poX-poL, poY-poT);
+                                    ctx.stroke();
+                                    
+                                    // 移动端没有onmouseover事件，需自行触发，暂时移动端不做
+                                    // 后边可以使用两种模式，点击/拖拽，移动端默认点击，PC默认拖拽
+
+                                    if (e && e.preventDefault) 
+                                        e.preventDefault();
+                                    else if (document.all)
+				                        e.returnValue = false;
+                                }
+                                drag.onmouseout = function(){
+                                    document.onmousemove = drag.onmousemove;
+                                };
+                                drag.addEventListener('touchmove',drag.onmousemove);
+                                drag.addEventListener('touchend',function(){
+                                    document.onmouseup();
+                                });
+                                document.onmouseup = function(){
+                                    if(!drag) return false;
+                                    // 所有节点恢复
+                                    for(j=0; j<dot.length; j++) {
+                                        dot[j].style.zIndex = 2;
+                                    }
+                                    body.removeChild(canvas);
+                                    drag.style.borderColor = 'white';
+                                    drag.onmousemove = null;
+                                    document.onmousemove = null;
+                                    drag.onmouseout = null;
+                                    if(target > -1 && target != index) {
+                                        var line = null;
+                                        if(target > index) {
+                                            if(target - index == 1) {
+                                                line = drag.nextElementSibling;
+                                            }else{
+                                                line = drag.parentNode.nextElementSibling.children[index%(side+1)*2];
+                                            }
+                                        }else{
+                                            if(target - index == -1) {
+                                                line = drag.previousElementSibling;
+                                            }else{
+                                                line = drag.parentNode.previousElementSibling.children[index%(side+1)*2];
+                                            }
+                                        }
+                                        line.style.background = 'black';
+                                        line.setAttribute('data-selected',true);
+                                        // 检查是否是最后一边
+                                        if((index-target)%(side+1) == 0) {
+                                            // left
+                                            _this.addScore(isClosedBox(line, 'left'));
+                                            // right
+                                            _this.addScore(isClosedBox(line, 'right'));
+                                        }else{
+                                            // top
+                                            _this.addScore(isClosedBox(line, 'top'));
+                                            // bottom
+                                            _this.addScore(isClosedBox(line, 'bottom'));
+                                        }
+                                        // 游戏是否结束
+                                        if(_this.gameOver()) {
+                                            alert('Gave Over, '+(_this.score > waitPlayer.score ? 'Winer is '+_this.name : (_this.score == waitPlayer.score ? 'Brew' :'Winer is '+waitPlayer.name))+'!');
+                                            return false;
+                                        }
+                                        if(!_this.continue) {
+                                            dot[target].style.borderColor = waitPlayer.color;
+                                            _this.end();
+                                        }else{
+                                            _this.continue = false;
+                                            if(_this.auto)
+                                                setTimeout(function(){
+                                                    _this.auto(_this)
+                                                }, 100);
+                                        }
+                                    }else{
+                                        drag.onmouseout = function(){
+                                            this.style.borderColor = 'white';
+                                            target = -1;
+                                        };
+                                    }
+                                    index = -1;
+                                    target = -1;
+                                    drag = null;
+                                }
+                            };
+                        }
+                    };
+                };
+                // 简单AI实现
+                // 是否有最后一边，没有则找下一条不为最后一边
+                var auto = function(AI) {
+                    console.log('AI');
+                    AI.play();
+                    var dot = document.getElementsByClassName('dot');
+                    var boxes = document.querySelectorAll('tr:not(.space) td:not(.space)');
+                    var avail, availArr, list = {}, index, tmp;
+                    for(var x=0; x < boxes.length; x++) {
+                        index = indexInParent(boxes[x]);
+                        avail = availBorder(boxes[x], index);
+                        availArr = Object.getOwnPropertyNames(avail);
+                        if(availArr.length == 0) {
+                            continue;
+                        }else if(availArr.length == 1) {
+                            //只取第一
+                            list['one'] = boxBorder(boxes[x], availArr[0], index);
+                        }else if(availArr.length == 2) {
+                            //取一个备用
+                            if(list['two']) continue;
+                            list['two'] = boxBorder(boxes[x], availArr[0], index);
+                            continue;
+                        }else{
+                            //任选其一，并检查周边
+                            if(list['other']) continue;
+                            var i = 0, pos;
+                            while(i < availArr.length) {
+                                pos = availArr[i];
+                                i++;
+                                list['other'] = boxBorder(boxes[x], pos, index);
+                                if(siblingBoxBorder(list['other'], pos) > 2) {
+                                    break;
+                                }
+                                list['other'] = null;
+                                continue;
+                            }
+                            continue;
+                        }
+                        break;
+                    }
+                    window.list = list;
+                    var box, start, end;
+                    if(list['one'])
+                        box = list['one'];
+                    else if(list['other'])
+                        box = list['other'];
+                    else
+                        box = list['two'];
+                    box.style.background = 'red';
+                    // 两端节点
+                    if(box.parentNode.className == 'space') {
+                        index = (indexInParent(box)-1)/2+indexInParent(box.parentNode)/2*(side+1);
+                        start = index;
+                        end = index+1;
+                    }else{
+                        index = indexInParent(box)/2+(indexInParent(box.parentNode)-1)/2*(side+1);
+                        start = index;
+                        end = index+side+1;
+                    }
+                    // 模拟拖拽
+                    setTimeout(function(){
+                        dot[start].onmousedown();
+                        dot[end].onmouseover();
+                        document.onmouseup();
+                        dot[end].onmouseout();
+                    },100);
+                };
+                var siblingBoxBorder = function(line, pos) {
+                    var box, avail;
+                    if(!line) return 4;
+                    box = boxBorder(line, pos, indexInParent(line));
+                    if(!box) return 4;
+                    avail = availBorder(box, indexInParent(box));
+                    return Object.getOwnPropertyNames(avail).length;
+                }
+                var isClosedBox = function(line, pos) {
+                    var t, r, b, l, box;
+                    var index = indexInParent(line);
+                    box = boxBorder(line, pos, index);
+                    if(!box) return false;
+                    index = indexInParent(box);
+                    var avail = availBorder(box, index);
+                    if(Object.getOwnPropertyNames(avail).length > 0)
+                        return false;
+                    return box;
+                };
+                var boxBorder = function(box, pos, child) {
+                    child = child || 0;
+                    switch(pos) {
+                        case 'top':
+                            if(indexInParent(box.parentNode))
+                                return box.parentNode.previousElementSibling.children[child];
+                            break;
+                        case 'left':
+                            if(indexInParent(box))
+                                return box.previousElementSibling;
+                            break;
+                        case 'right':
+                            if(indexInParent(box) < box.parentNode.children.length-1)
+                                return box.nextElementSibling;
+                            break;
+                        case 'bottom':
+                            if(indexInParent(box.parentNode) < box.parentNode.parentNode.children.length-1)
+                                return box.parentNode.nextElementSibling.children[child];
+                            break;
+                        default:
+                            return null;
+                    }
+                    return null;
+                };
+                var availBorder = function(box, index, check) {
+                    var avail = {};
+                    var check = check || {'top':'top', 'left':'left', 'right':'right', 'bottom':'bottom'};
+                    var border = null;
+                    for(var x in check) {
+                        border = boxBorder(box, x, index);
+                        if(border && !border.getAttribute('data-selected'))
+                            avail[check[x]] = 1;
+                    }
+                    return avail;
+
+                };
+                var init = function() {
+                    var html = '';
+                    var head = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+                    html += '<p class="title" title="规则: 每方轮流以纵或横方向画一条直线连结两点，但不能画在已被占领区域内。当画线使一区域封闭时，在区域内画一该玩家符号，表示占领。">Dots And Boxes</p>';
+                    html += '<div class="players"> \
+                        <div class="player1 '+player1.name+'"> \
+                            <img class="head" src="'+head+'" style="border-color:'+player1.color+'"> \
+                            <span class="banner">'+player1.name.substr(0,1).toUpperCase()+'</span> \
+                            <p><span class="name">'+player1.name+'</span><label> :name</label></p> \
+                            <p><span class="status">'+player1.status+'</span><label> :status</label></p> \
+                            <p><span class="score">'+player1.score+'</span><label> :score</label></p> \
+                            <i>&and;</i> \
+                        </div> \
+                        <div class="vs">VS</div> \
+                        <div class="player2 '+player2.name+'"> \
+                            <img class="head" src="'+head+'" style="border-color:'+player2.color+'"> \
+                            <span class="banner">'+player2.name.substr(0,1).toUpperCase()+'</span> \
+                            <p><label>name: </label><span class="name">'+player2.name+'</span></p> \
+                            <p><label>status: </label><span class="status">'+player2.status+'</span></p> \
+                            <p><label>score: </label><span class="score">'+player2.score+'</span></p> \
+                            <i>&and;</i> \
+                        </div> \
+                    </div>';
+                    html += '<table cellpadding="0" cellspacing="0"><tbody>';
+                    var i,j;
+                    for(i=0; i < side*2+1; i++) {
+                        if(i%2 == 0)
+                            html += '<tr class="space">'
+                        else
+                            html += '<tr>'
+                        for(j=0; j < side*2+1; j++) {
+                            if(i%2 == 0 && j%2 == 0)
+                                html += '<td class="space dot"></td>';
+                            else if(j%2 == 0)
+                                html += '<td class="space"></td>';
+                            else
+                                html += '<td></td>';
+                        }
+                        html += '</tr>';
+                    }
+                    html += '</tbody></table>';
+                    document.getElementsByClassName('container')[0].innerHTML = html;
+                };
+                var side = 5;
+                var gameMod = 1; // 1: 单人模式, 2: 双人模式
+                var player1 = new player('Player1', 'pink');
+                var player2 = new player('Player2', 'cornflowerblue');
+                var waitPlayer = player2;
+                if(gameMod == 1) {
+                    player2.name = 'Computer';
+                    player2.auto = auto;
+                }
+                init();
+                // 游戏开始
+                player1.round();
+                // 画线
+                return false;
+            }
+        </script>
+    </body>
+</html>
