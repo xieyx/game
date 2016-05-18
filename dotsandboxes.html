@@ -162,19 +162,19 @@
                 return -1;
             }
             function mousePosition(e){ 
-		        e = e || window.event;
-		        var target = e.target || e.srcElement; // 获得事件源
+                e = e || window.event;
+                var target = e.target || e.srcElement; // 获得事件源
                 if(e.touches && e.touches[0]) {
                     return {x:e.touches[0].pageX, y:e.touches[0].pageY};
                 }
                 if(e.pageX || e.pageY){ 
-			        return {x:e.pageX, y:e.pageY}; 
-		        }
-		        return { 
-			        x:e.clientX + document.body.scrollLeft - document.body.clientLeft, 
-			        y:e.clientY + document.body.scrollTop - document.body.clientTop 
-		        }; 
-	        }
+                    return {x:e.pageX, y:e.pageY}; 
+                }
+                return { 
+                    x:e.clientX + document.body.scrollLeft - document.body.clientLeft, 
+                    y:e.clientY + document.body.scrollTop - document.body.clientTop 
+                }; 
+            }
             function offset(el) {
                 var rect = el.getBoundingClientRect();
 
@@ -262,7 +262,7 @@
                                 var e = e || window.event;
                                 var drag = this;
                                 var startY = offset(drag).top+9;
-		                        var startX = offset(drag).left+8;
+                                var startX = offset(drag).left+8;
                                 if (e && e.preventDefault) 
                                     e.stopPropagation();
                                 else if (document.all)
@@ -291,7 +291,7 @@
                                     var poT = scrollTop();
                                     var poL = scrollLeft();
                                     var poX = mousePosition(e).x;
-		                        	var poY = mousePosition(e).y;
+                                    var poY = mousePosition(e).y;
                                     //清空画布
                                     ctx.clearRect(0,0,document.documentElement.clientWidth,document.documentElement.clientHeight);
                                     ctx.beginPath();
@@ -309,7 +309,7 @@
                                     if (e && e.preventDefault) 
                                         e.preventDefault();
                                     else if (document.all)
-				                        e.returnValue = false;
+                                        e.returnValue = false;
                                 }
                                 drag.onmouseout = function(){
                                     document.onmousemove = drag.onmousemove;
