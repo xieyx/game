@@ -1,0 +1,235 @@
+<!Doctype html>
+<html>
+    <head>
+        <title>拼图</title>
+        <meta charset=utf-8 />
+        <style>
+            * {margin: 0;padding: 0;}
+            img {border: none;float:left;}
+            table {margin:15px auto 0;border-top:1px solid #333;border-left:1px solid #333;}
+            td {background: #BCBCBC;border-width:1px;border-color:#FFF #333 #333 #FFF;border-style:solid;text-align: center;}
+            td.quit {background: #FFF;}
+            .source {position: fixed;top: 0;right: 0;}
+            .source img {max-width: 300px;}
+            #add, #subtract {text-decoration: none;display: block;width: 30px; height: 30px;line-height: 30px;text-align: center;background: #efefef;color: #000;position: absolute;bottom: -30px;}
+            #add {right: 0}
+            #subtract {left: 0;}
+            #text {position: absolute;bottom: -30px;left: 30px;right: 30px;height: 29px;background: #fff;line-height: 30px;text-align: center;border-bottom: 1px solid #efefef;}
+        </style>
+    </head>
+    <body>
+
+    </body>
+    <script>
+        /**
+         * 拼图生成算法
+         * 随机将数字填充在任意格内
+         * 计算拼图序列的奇偶性，通过逆序数决定
+         * 若是奇数并且边长是偶数或者空白区块所在行为偶数说明拼图无解
+         * 若是偶数并且边长是偶数并且空白区块所在行为偶数说明拼图无解
+         * 将末尾或开头两个对换即可
+         */
+        var sideLen = 3,                //拼图边长
+        blockValues = [],               //格内值
+        spaceValue  = 0,                //总格子数
+        result      = '',               //拼图结果
+        isGameover  = false,            //是否结束
+        spaceBlock  = 0,                //空白区块位置
+        pictures    = [],
+        width       = 500,
+        _BLANK      = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D",
+        source = function(){
+            var src = './images/puzzle/1.jpg';
+            var img = new Image;
+            
+            img.onload = function() {
+                //先缩放
+                var imgScale = width/img.width;
+                var imgWidth = img.width*imgScale;
+                var imgHeight = img.height*imgScale;
+                var imgX, imgY;
+                for(var i=0; i<sideLen; i++) {
+                    for(var j=0; j<sideLen; j++) {
+                        var canvas = document.createElement('canvas');
+                        canvas.width = canvas.height = width/sideLen;
+                        var ctx = canvas.getContext('2d');
+                        ctx.scale(imgScale, imgScale);
+                        regX = (imgWidth-canvas.width*(sideLen-2))/imgScale/2+(j-1)*canvas.width/imgScale;
+                        regY = (imgHeight-canvas.height*(sideLen-2))/imgScale/2+(i-1)*canvas.height/imgScale;
+                        ctx.translate(-regX, -regY);
+                        ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
+                        pictures.push(canvas.toDataURL('image/jpeg', 0.8));
+                    }
+                }
+                render();
+            };
+            img.src = src;
+        },
+        init = function(){
+            blockValues = [];
+            spaceValue  = sideLen*sideLen;
+            result      = '';
+            isGameover  = false;
+            spaceBlock  = 0;
+            pictures    = [];
+        },
+        jigsaw = function(){
+            for(var i=1; i<=spaceValue; i++){
+                blockValues.push(i);
+            }
+            result = blockValues.toString();
+            //打乱数组内元素的顺序
+            blockValues.sort(function(){ return 0.5 - Math.random() });
+            for(var i=0; i<spaceValue; i++){
+                if(blockValues[i] == spaceValue){
+                    spaceBlock = i;
+                    break;
+                }
+            }
+            if(inverseNum(blockValues,spaceValue)%2){
+                if(sideLen%2 || Math.floor(spaceBlock/2)%2) exchange();
+            }else{
+                if(sideLen%2==0 && Math.floor(spaceBlock/2)%2==0) exchange();
+            }
+        },
+        exchange = function(){
+            //若空白格在末尾两个中则交换头两个
+            if(spaceBlock == spaceValue-1 || spaceBlock == spaceValue-2){
+                blockValues.splice(0,2,blockValues.slice(1)[0],blockValues.slice(0)[0]);
+            }else{
+                blockValues.splice(-2,2,blockValues.slice(-1)[0],blockValues.slice(-2)[0]);
+            }
+        },
+        output = function(){
+            var html = '<center><h1>拼图游戏</h1><br/><p>操作方法: &nbsp;&nbsp;&nbsp;w（↑）&nbsp;&nbsp;&nbsp;&nbsp;<br>&nbsp;&nbsp;&nbsp;&nbsp;a（←）s（↓）d（→）</p></center><br/>';
+            html += '<table width="'+width+'" height="'+width+'" border="0" cellspacing="0" cellpadding="0">';
+            for(var i=0; i < sideLen; i++){
+                html += '<tr>';
+                for(var j=0; j < sideLen; j++){
+                    html += '<td></td>';
+                }
+                html += '</tr>';
+            }
+            html += '</table>';
+            html += '<div class="source"><img src="./images/puzzle/1.jpg"><div class="settings"><a id="subtract" href="javascript:;">&lt;</a><div id="text">'+sideLen+'</div><a id="add" href="javascript:;">&gt;</a></div></div>'
+            document.body.innerHTML = html;
+            var subtract = document.getElementById('subtract');
+            var add = document.getElementById('add');
+            var text = document.getElementById('text');
+            subtract.addEventListener('click', function(){
+                sideLen--;
+                if(sideLen < 3) {
+                    sideLen = 3;
+                    return false;
+                }
+                init();
+                jigsaw();
+                output();
+                source();
+            });
+            add.addEventListener('click', function(){
+                sideLen++;
+                if(sideLen > 9) {
+                    sideLen = 9;
+                    return false;
+                }
+                init();
+                jigsaw();
+                output();
+                source();
+            })
+        },
+        render = function(){
+            for(var i=0; i<spaceValue; i++){
+                if(blockValues[i] == spaceValue){
+                    blockChange(0,0,'','quit',''+i,true);
+                }else{
+                    blockChange(0,0,blockValues[i],'',''+i,true)
+                }
+            }
+            //可能拼图并没有打乱
+            gameover();
+            //键盘控制 上下左右
+            document.onkeydown = function(e){
+                if(isGameover) return false;
+                var e = e || event;
+                var key=e.keyCode;
+                console.log(key)
+                //上38 下40 左37 右39
+                switch(key){
+                    case 39:
+                    case 68:
+                        if(spaceBlock%sideLen > 0){
+                            spaceBlock--;
+                            blockChange(0,1,blockValues[spaceBlock]);
+                        }
+                        break;
+                    case 40:
+                    case 83:
+                        if(Math.floor(spaceBlock/sideLen) > 0){
+                            spaceBlock -= sideLen;
+                            blockChange(1,0,blockValues[spaceBlock]);
+                        }
+                        break;
+                    case 37:
+                    case 65:
+                        if(spaceBlock%sideLen < sideLen-1){
+                            spaceBlock++;
+                            blockChange(0,-1,blockValues[spaceBlock]);
+                        }
+                        break;
+                    case 38:
+                    case 87:
+                        if(Math.floor(spaceBlock/sideLen) < sideLen-1){
+                            spaceBlock += sideLen;
+                            blockChange(-1,0,blockValues[spaceBlock]);
+                        }
+                        break;
+                }
+                blockChange(0,0,'','quit');
+                gameover();
+            }
+        },
+        blockChange = function(x,y,html,className,block,noassign){
+            var block     = block || spaceBlock;
+            var position  = positionTarget(Math.floor(block/sideLen)+x,block%sideLen+y);
+            var className = className || '';
+            var html      = html || '';
+            var noassign  = noassign || false;
+            position.className = className;
+            position.innerHTML = '<img src="'+(html ? pictures[html-1] : _BLANK)+'">';
+            if(!noassign)
+                blockValues[block+x*sideLen+y] = html == '' ? spaceValue : html;
+        },
+        gameover = function(){
+            if(result == blockValues.toString()){
+                isGameover = true;
+                alert('success');
+            }
+        },
+        positionTarget = function(i,j){
+            return document.getElementsByTagName('tr')[i].getElementsByTagName('td')[j];
+        },
+        //计算逆序数, 忽略空白格
+        inverseNum = function(arr,ignore){
+            var tmp = new Array();
+            var ignore = ignore || 0;
+            var num = 0;
+            for(var i=0; i<arr.length; i++){
+                for(var j=0; j<tmp.length; j++){
+                    if(arr[i] < tmp[j] && tmp[j] != ignore && arr[i] != ignore)
+                        num++;
+                }
+                tmp.push(arr[i]);
+            }
+            return num;
+        };
+        window.onload = function(){
+            init();
+            jigsaw();
+            output();
+            source();
+            
+        }
+    </script>
+</html>
